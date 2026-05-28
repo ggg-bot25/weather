@@ -22,20 +22,33 @@ import CitySearch from './components/CitySearch';
 import WeatherVisual from './components/WeatherVisual';
 import WeatherDetails from './components/WeatherDetails';
 import Forecasts from './components/Forecasts';
+import CompareView from './components/CompareView';
 
 export default function App() {
+  const [viewMode, setViewMode] = useState<'single' | 'compare'>('single');
+  const [useCelsius, setUseCelsius] = useState(true);
+  const [showConfigGuide, setShowConfigGuide] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Single City States
   const [query, setQuery] = useState('서울');
   const [data, setData] = useState<ResponseData | null>(null);
-  const [useCelsius, setUseCelsius] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [showConfigGuide, setShowConfigGuide] = useState(false);
+
+  // Compare Mode States
+  const [cityA, setCityA] = useState('서울');
+  const [cityB, setCityB] = useState('뉴욕');
+  const [dataA, setDataA] = useState<ResponseData | null>(null);
+  const [dataB, setDataB] = useState<ResponseData | null>(null);
+  const [isLoadingA, setIsLoadingA] = useState(false);
+  const [isLoadingB, setIsLoadingB] = useState(false);
 
   // Check if API key is set in env
   const apiKey = import.meta.env.VITE_OPENWEATHER_API_KEY;
   const isApiConfigured = !!(apiKey && apiKey.trim() !== "" && apiKey !== "MY_GEMINI_API_KEY" && apiKey !== "VITE_OPENWEATHER_API_KEY");
 
-  const loadWeather = async (targetCity: string) => {
+  // Single Loader
+  const loadSingleWeather = async (targetCity: string) => {
     setIsLoading(true);
     setErrorMsg(null);
     try {
@@ -50,17 +63,61 @@ export default function App() {
     }
   };
 
-  // Trigger load on query or metric switch
+  // Compare A Loader
+  const loadWeatherA = async (targetCity: string) => {
+    setIsLoadingA(true);
+    setErrorMsg(null);
+    try {
+      const response = await weatherService.getWeatherData(targetCity, useCelsius);
+      setDataA(response);
+      setCityA(targetCity);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(`도시 A (${targetCity}) 정보를 불러오는 데 실패했습니다.`);
+    } finally {
+      setIsLoadingA(false);
+    }
+  };
+
+  // Compare B Loader
+  const loadWeatherB = async (targetCity: string) => {
+    setIsLoadingB(true);
+    setErrorMsg(null);
+    try {
+      const response = await weatherService.getWeatherData(targetCity, useCelsius);
+      setDataB(response);
+      setCityB(targetCity);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(`도시 B (${targetCity}) 정보를 불러오는 데 실패했습니다.`);
+    } finally {
+      setIsLoadingB(false);
+    }
+  };
+
+  // Trigger load on view change or metric toggle
   useEffect(() => {
-    loadWeather(query);
-  }, [useCelsius]);
+    if (viewMode === 'single') {
+      loadSingleWeather(query);
+    } else {
+      loadWeatherA(cityA);
+      loadWeatherB(cityB);
+    }
+  }, [useCelsius, viewMode]);
 
   const handleSearch = (city: string) => {
-    loadWeather(city);
+    if (viewMode === 'single') {
+      loadSingleWeather(city);
+    }
   };
 
   const handleRefresh = () => {
-    loadWeather(query);
+    if (viewMode === 'single') {
+      loadSingleWeather(query);
+    } else {
+      loadWeatherA(cityA);
+      loadWeatherB(cityB);
+    }
   };
 
   return (
@@ -68,7 +125,7 @@ export default function App() {
       <div className="max-w-6xl mx-auto space-y-6">
         
         {/* UPPER TITLE / NAV BAR */}
-        <header id="app-header" className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-200/60 dark:border-slate-800/60 gap-4">
+        <header id="app-header" className="flex flex-col md:flex-row md:items-center md:justify-between pb-4 border-b border-slate-200/60 dark:border-slate-800/60 gap-4">
           <div className="flex items-center gap-3 pointer-events-none">
             <div id="app-logo-bg" className="p-2.5 bg-blue-500 rounded-2xl shadow-md shadow-blue-500/20 text-white">
               <CloudSun className="w-6 h-6 animate-pulse" />
@@ -83,7 +140,33 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* View Mode Switching Controls */}
+            <div id="view-mode-selector" className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+              <button
+                type="button"
+                onClick={() => setViewMode('single')}
+                className={`text-xs px-3 py-1.5 rounded-lg transition-all font-semibold font-display ${
+                  viewMode === 'single'
+                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm' 
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                단일 도시
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('compare')}
+                className={`text-xs px-3 py-1.5 rounded-lg transition-all font-semibold font-display ${
+                  viewMode === 'compare'
+                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm' 
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                두 도시 비교
+              </button>
+            </div>
+
             {/* Celsius/Fahrenheit Metric Switcher */}
             <div id="metric-switch" className="flex bg-slate-100 dark:bg-slate-900 p-1.5 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
               <button
@@ -115,7 +198,7 @@ export default function App() {
               id="guide-toggle-btn"
               type="button"
               onClick={() => setShowConfigGuide(!showConfigGuide)}
-              className={`flex items-center gap-1.5 text-xs px-3.5 py-2.5 rounded-xl border transition-all ${
+              className={`flex items-center gap-1.5 text-xs px-3 py-2.5 rounded-xl border transition-all ${
                 showConfigGuide 
                   ? 'border-blue-500/30 bg-blue-50/50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400' 
                   : 'border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-500 dark:text-slate-400'
@@ -133,7 +216,7 @@ export default function App() {
               className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-500 dark:text-slate-400 transition-all active:scale-95"
               title="새로고침"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isLoading || isLoadingA || isLoadingB ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </header>
@@ -193,15 +276,6 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* CITY SEARCH */}
-        <section id="search-section">
-          <CitySearch 
-            onSearch={handleSearch} 
-            isLoading={isLoading} 
-            currentCityName={data?.current?.cityName || query} 
-          />
-        </section>
-
         {/* ERROR FIELD */}
         {errorMsg && (
           <div id="error-message-box" className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-2xl flex items-center gap-3 text-sm">
@@ -210,125 +284,133 @@ export default function App() {
           </div>
         )}
 
-        {/* CORE GRID CONTENT */}
-        <div id="app-grid-container" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* LEFT: VISUAL SKY CARD (lg:col-span-4) */}
-          <section id="visual-showcase" className="lg:col-span-5 h-full">
-            {data?.current ? (
-              <div className="relative h-full flex flex-col justify-between">
-                
-                {/* Embedded Visual Sky container */}
-                <WeatherVisual condition={data.current.condition} />
+        {/* DYNAMIC LAYOUT BASED ON MODE */}
+        {viewMode === 'single' ? (
+          <div className="space-y-6">
+            {/* SINGLE CITY SEARCH & PRESETS */}
+            <section id="search-section">
+              <CitySearch 
+                onSearch={handleSearch} 
+                isLoading={isLoading} 
+                currentCityName={data?.current?.cityName || query} 
+              />
+            </section>
 
-                {/* Overlaid Info (Glassmorphism layout inside visual weather frame) */}
-                <div id="visual-card-text-overlay" className="absolute inset-0 flex flex-col justify-between p-6 md:p-8 text-white z-10 select-none">
-                  
-                  {/* Top line metadata */}
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold tracking-wide uppercase font-display bg-white/20 px-2.5 py-1 rounded-full backdrop-blur-md border border-white/10">
-                          {data.current.cityName}
-                        </span>
-                        <span className="text-xs font-semibold text-slate-100 bg-slate-800/40 px-2.5 py-1 rounded-full backdrop-blur-md border border-white/5 font-mono">
-                          {data.current.countryName}
-                        </span>
+            {/* SINGLE CITY GRID */}
+            <div id="app-grid-container" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* LEFT: VISUAL SKY CARD */}
+              <section id="visual-showcase" className="lg:col-span-5 h-full">
+                {data?.current ? (
+                  <div className="relative h-full flex flex-col justify-between">
+                    <WeatherVisual condition={data.current.condition} />
+
+                    <div id="visual-card-text-overlay" className="absolute inset-0 flex flex-col justify-between p-6 md:p-8 text-white z-10 select-none">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-semibold tracking-wide uppercase font-display bg-white/20 px-2.5 py-1 rounded-full backdrop-blur-md border border-white/10">
+                              {data.current.cityName}
+                            </span>
+                            <span className="text-xs font-semibold text-slate-100 bg-slate-800/40 px-2.5 py-1 rounded-full backdrop-blur-md border border-white/5 font-mono">
+                              {data.current.countryName}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-white/70 font-mono pl-0.5">
+                            동기화 시간: {data.current.timestamp}
+                          </p>
+                        </div>
+
+                        <div>
+                          {data.current.isRealApi ? (
+                            <span className="text-[10px] bg-green-500 text-white font-bold px-2 py-1 rounded-md shadow-sm uppercase font-sans animate-pulse">
+                              LIVE
+                            </span>
+                          ) : (
+                            <span className="text-[10px] bg-sky-950/80 text-sky-200 border border-sky-500/30 font-bold px-2 py-1 rounded-md shadow-sm font-sans">
+                              SIMULATED
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-[10px] text-white/70 font-mono pl-0.5">
-                        동기화 시간: {data.current.timestamp}
-                      </p>
-                    </div>
 
-                    {/* API Mode Indicator */}
-                    <div>
-                      {data.current.isRealApi ? (
-                        <span className="text-[10px] bg-green-500 text-white font-bold px-2 py-1 rounded-md shadow-sm uppercase font-sans animate-pulse">
-                          LIVE
-                        </span>
-                      ) : (
-                        <span className="text-[10px] bg-sky-950/80 text-sky-200 border border-sky-500/30 font-bold px-2 py-1 rounded-md shadow-sm font-sans">
-                          SIMULATED
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                      <div className="space-y-4">
+                        <div className="flex items-baseline gap-1 select-none pointer-events-none">
+                          <h2 className="text-6xl md:text-7xl font-extrabold tracking-tight font-display drop-shadow-md">
+                            {data.current.temperature}
+                          </h2>
+                          <span className="text-3xl font-light drop-shadow-sm pointer-events-none">
+                            °{useCelsius ? 'C' : 'F'}
+                          </span>
+                        </div>
 
-                  {/* Middle representation: Temp & status */}
-                  <div className="space-y-4">
-                    <div className="flex items-baseline gap-1 select-none pointer-events-none">
-                      <h2 className="text-6xl md:text-7xl font-extrabold tracking-tight font-display drop-shadow-md">
-                        {data.current.temperature}
-                      </h2>
-                      <span className="text-3xl font-light drop-shadow-sm pointer-events-none">
-                        °{useCelsius ? 'C' : 'F'}
-                      </span>
-                    </div>
+                        <div className="space-y-1">
+                          <h3 className="text-lg md:text-xl font-bold tracking-tight font-display drop-shadow-sm">
+                            {data.current.condition === 'Clear' ? '맑음 (Clear)' :
+                             data.current.condition === 'Clouds' ? '구름많음 (Clouds)' :
+                             data.current.condition === 'Rain' ? '비 (Rain)' :
+                             data.current.condition === 'Drizzle' ? '이슬비 (Drizzle)' :
+                             data.current.condition === 'Thunderstorm' ? '낙뢰천둥 (Thunderstorm)' :
+                             data.current.condition === 'Snow' ? '눈 (Snow)' :
+                             data.current.condition === 'Mist' ? '안개 (Mist)' : '강풍 (Windy)'}
+                          </h3>
+                          <p className="text-xs md:text-sm text-white/85 leading-relaxed drop-shadow-sm font-sans max-w-sm">
+                            {data.current.description}
+                          </p>
+                        </div>
+                      </div>
 
-                    <div className="space-y-1">
-                      <h3 className="text-lg md:text-xl font-bold tracking-tight font-display drop-shadow-sm">
-                        {data.current.condition === 'Clear' ? '맑음 (Clear)' :
-                         data.current.condition === 'Clouds' ? '구름많음 (Clouds)' :
-                         data.current.condition === 'Rain' ? '비 (Rain)' :
-                         data.current.condition === 'Drizzle' ? '이슬비 (Drizzle)' :
-                         data.current.condition === 'Thunderstorm' ? '낙뢰천둥 (Thunderstorm)' :
-                         data.current.condition === 'Snow' ? '눈 (Snow)' :
-                         data.current.condition === 'Mist' ? '안개 (Mist)' : '강풍 (Windy)'}
-                      </h3>
-                      <p className="text-xs md:text-sm text-white/85 leading-relaxed drop-shadow-sm font-sans max-w-sm">
-                        {data.current.description}
-                      </p>
+                      <div className="pt-4 border-t border-white/15 flex justify-between text-xs text-white/90">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-blue-400" />
+                          <span>최저: <strong>{data.current.minTemp}°</strong></span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-orange-400" />
+                          <span>최고: <strong>{data.current.maxTemp}°</strong></span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Bottom metrics summary strip */}
-                  <div className="pt-4 border-t border-white/15 flex justify-between text-xs text-white/90">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-blue-400" />
-                      <span>최저: <strong>{data.current.minTemp}°</strong></span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-orange-400" />
-                      <span>최고: <strong>{data.current.maxTemp}°</strong></span>
-                    </div>
+                ) : (
+                  <div className="w-full h-[400px] rounded-3xl bg-slate-200 dark:bg-slate-900 animate-pulse flex items-center justify-center">
+                    <p className="text-sm text-slate-400 font-display">일기 분석 중...</p>
                   </div>
+                )}
+              </section>
 
-                </div>
-
-              </div>
-            ) : (
-              // Loading visual placeholder skeleton
-              <div className="w-full h-[400px] rounded-3xl bg-slate-200 dark:bg-slate-900 animate-pulse flex items-center justify-center">
-                <p className="text-sm text-slate-400">일기 분석 중...</p>
-              </div>
-            )}
-          </section>
-
-          {/* RIGHT: DETAILS, HOURLY & WEEKLY PREVIEW (lg:col-span-8) */}
-          <main id="weather-forecast-details" className="lg:col-span-7 space-y-6">
-            {data ? (
-              <>
-                {/* 6 Grid details list widgets */}
-                <WeatherDetails data={data.current} useCelsius={useCelsius} />
-
-                {/* Subsections: Hourly & Daily */}
-                <Forecasts hourly={data.hourly} daily={data.daily} useCelsius={useCelsius} />
-              </>
-            ) : (
-              // Loading details placeholder
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {Array.from({ length: 6 }).map((_, idx) => (
-                    <div key={idx} className="h-32 rounded-2xl bg-slate-200 dark:bg-slate-900 animate-pulse" />
-                  ))}
-                </div>
-                <div className="h-44 rounded-3xl bg-slate-200 dark:bg-slate-900 animate-pulse" />
-                <div className="h-64 rounded-3xl bg-slate-200 dark:bg-slate-900 animate-pulse" />
-              </div>
-            )}
-          </main>
-
-        </div>
+              {/* RIGHT: DETAILS, HOURLY & WEEKLY PREVIEW */}
+              <main id="weather-forecast-details" className="lg:col-span-7 space-y-6">
+                {data ? (
+                  <>
+                    <WeatherDetails data={data.current} useCelsius={useCelsius} />
+                    <Forecasts hourly={data.hourly} daily={data.daily} useCelsius={useCelsius} />
+                  </>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {Array.from({ length: 6 }).map((_, idx) => (
+                        <div key={idx} className="h-32 rounded-2xl bg-slate-200 dark:bg-slate-900 animate-pulse" />
+                      ))}
+                    </div>
+                    <div className="h-44 rounded-3xl bg-slate-200 dark:bg-slate-900 animate-pulse" />
+                    <div className="h-64 rounded-3xl bg-slate-200 dark:bg-slate-900 animate-pulse" />
+                  </div>
+                )}
+              </main>
+            </div>
+          </div>
+        ) : (
+          /* COMPARE DUAL CITY VIEW */
+          <CompareView
+            dataA={dataA}
+            dataB={dataB}
+            isLoadingA={isLoadingA}
+            isLoadingB={isLoadingB}
+            onSearchA={loadWeatherA}
+            onSearchB={loadWeatherB}
+            useCelsius={useCelsius}
+          />
+        )}
 
         {/* LOWER FOOTER */}
         <footer id="app-footer" className="pt-8 pb-4 text-center text-xs text-slate-400 dark:text-slate-500 pointer-events-none border-t border-slate-100 dark:border-slate-800">
