@@ -1,0 +1,6 @@
+{
+  "name": "Weather App",
+  "description": "실시간 도시 검색, 시간별/5일간 일기 예보, 세련된 대기 상태 연출 일러스트 및 OpenWeatherMap API를 손쉽게 통합할 수 있는 고품격 날씨 애플리케이션입니다.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
